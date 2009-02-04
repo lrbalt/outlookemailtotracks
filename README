@@ -1,0 +1,9 @@
+This is the code for a plugin for Microsoft Outlook for adding an email from
+Outlook as a todo to your Tracks 
+
+The pluging uses the REST API of Tracks
+
+Original author: Greg Jarman
+
+For installation instructions, see http://getontracks.org/wiki/Outlook-Integration/
+For more information, see this forum thread: http://www.getontracks.org/forums/viewthread/268/
