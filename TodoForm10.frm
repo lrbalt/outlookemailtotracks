@@ -1,7 +1,7 @@
 VERSION 5.00
 Begin {C62A69F0-16DC-11CE-9E98-00AA00574A4F} TodoForm 
    Caption         =   "Tracks Todo"
-   ClientHeight    =   3855
+   ClientHeight    =   4725
    ClientLeft      =   45
    ClientTop       =   330
    ClientWidth     =   7035
@@ -14,6 +14,7 @@ Attribute VB_Creatable = False
 Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 
+
 Option Explicit
 
 ' greg jarman   20080821   v1.0     initial version
@@ -22,7 +23,7 @@ Option Explicit
 
 ' the URL of the tracks installation, required.
 Const sURL = "http://your.tracks.host/tracks/"
-
+ 
 ' set username and password here, required.
 Const sUsername = "userid"
 Const sPassword = "password"
@@ -32,7 +33,7 @@ Const sProxy = ""
 
 ' set this to true if you want to refresh the projects and contexts each time a new todo is created.
 ' otherwise the data is gathered the first time a todo is created after outlook is opened.
-Const Update_Projects_And_Contexts_Each_Time = False
+Const Update_Projects_And_Contexts_Each_Time = True
 
 ' internal variables
 Private Type Context
@@ -49,6 +50,7 @@ Private Type Project
 End Type
 
 Dim Projects() As Project
+Dim ActiveProjects() As Project
 Dim Projects_Length As Integer
 Public Projects_Loaded As Boolean
 
@@ -69,6 +71,7 @@ End Function
 
 Private Sub ConfigureWinHttpRequest(WinHttpRequest As Variant)
   WinHttpRequest.SetCredentials sUsername, sPassword, HTTPREQUEST_SETCREDENTIALS_FOR_SERVER
+  WinHttpRequest.SetRequestHeader "Content-type", "text/xml"
   If Len(sProxy) > 0 Then
     WinHttpRequest.SetProxy 2, sProxy, ""
   End If
@@ -189,11 +192,18 @@ Private Sub PopulateProjectListBox()
   TodoForm.ProjectListBox.Style = fmStyleDropDownList
     
   Dim i
+  Dim count As Integer
+  ReDim ActiveProjects(0 To Projects_Length - 1)
+  count = 0
+  
   For i = 0 To Projects_Length - 1
     If Projects(i).State = "active" Then
       TodoForm.ProjectListBox.AddItem Projects(i).Name
+      ActiveProjects(count) = Projects(i)
+      count = count + 1
     End If
   Next i
+  
   TodoForm.ProjectListBox.ListIndex = old_index
 End Sub
 
@@ -246,7 +256,7 @@ Private Function HTMLEncode(ByVal Text As String, Optional HardSpaces As Boolean
   HTMLEncode = NewString
 End Function
 
-Private Sub CreateTodo(Description As String, Notes As String, ContextID As Integer, ProjectID As Integer)
+Private Sub CreateTodo(Description As String, Notes As String, ContextId As Integer, ProjectId As Integer)
   Dim WinHttpRequest As Object
   Dim sData As String
   Dim aBody() As Byte
@@ -255,15 +265,15 @@ Private Sub CreateTodo(Description As String, Notes As String, ContextID As Inte
   WinHttpRequest.Open "POST", sURL & "todos.xml", False
   ConfigureWinHttpRequest WinHttpRequest
     
-  sData = "todo[description]=" & HTMLEncode(Description) & _
-    "&todo[notes]=" & HTMLEncode(Notes) & _
-    "&todo[context_id]=" & HTMLEncode(Str(ContextID))
+  sData = "<todo><description>" + Description + "</description>"
+  sData = sData & "<notes>" & Notes & "</notes>"
+  sData = sData & "<context_id>" & Str(ContextId) & "</context_id>"
     
-  If ProjectID > 0 Then
-    sData = sData & "&todo[project_id]=" & HTMLEncode(Str(ProjectID))
+  If ProjectId > 0 Then
+    sData = sData & "<project_id>" & Str(ProjectId) & "</project_id>"
   End If
 
-  sData = sData & vbCrLf
+  sData = sData & "</todo>" & vbCrLf
     
   aBody = StrConv(sData, vbFromUnicode)
   WinHttpRequest.Send CByte(aBody)
@@ -281,7 +291,15 @@ Private Sub AddActionButton_Click()
   ElseIf ContextListBox.ListIndex = -1 Then
     MsgBox "Must have a context!", vbExclamation
   Else
-    CreateTodo DescriptionTextBox.Text, NotesTextBox.Text, ContextListBox.ListIndex + 1, ProjectListBox.ListIndex + 1
+    Dim ContextId As Integer
+    Dim ProjectId As Integer
+    ContextId = Contexts(ContextListBox.ListIndex).id
+    ProjectId = 0
+    If ProjectListBox.ListIndex > 0 Then
+      ProjectId = ActiveProjects(ProjectListBox.ListIndex).id
+    End If
+    
+    CreateTodo DescriptionTextBox.Text, NotesTextBox.Text, ContextId, ProjectId
     FormReset
     TodoForm.Hide
   End If
@@ -295,6 +313,11 @@ End Sub
 Private Sub CancelButton_Click()
   FormReset
   TodoForm.Hide
+End Sub
+
+
+Private Sub ClearProject_Click()
+  ProjectListBox.ListIndex = -1
 End Sub
 
 Private Sub UserForm_Initialize()
